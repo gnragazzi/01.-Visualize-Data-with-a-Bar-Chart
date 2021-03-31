@@ -5,25 +5,13 @@ const displayChart = async () => {
   const chartHeight = chartContainer.getBoundingClientRect().height
   const chartWidth = chartContainer.getBoundingClientRect().width
   const { data: dataset } = await fetchData()
-  const date = dataset.map(([item]) => {
-    const year = item.substring(0, 4)
-    let quarter
-    switch (item.substring(5, 7)) {
-      case '01':
-        quarter = 'Q1'
-        break
-      case '04':
-        quarter = 'Q2'
-        break
-      case '07':
-        quarter = 'Q3'
-        break
-      case '10':
-        quarter = 'Q4'
-        break
-    }
-    return `${year} ${quarter}`
-  })
+
+  let tooltip = d3
+    .select('body')
+    .append('div')
+    .attr('class', 'tooltip')
+    .attr('id', 'tooltip')
+  // .style('opacity', 0)
 
   const svg = d3
     .select('.chart-container')
@@ -41,13 +29,9 @@ const displayChart = async () => {
     return new Date(item[0])
   })
 
-  var xMax = new Date(d3.max(yearsDate))
-  xMax.setMonth(xMax.getMonth() + 3)
-  console.log(xMax)
-
   const xScale = d3
     .scaleTime()
-    .domain([d3.min(yearsDate), xMax])
+    .domain([d3.min(yearsDate), new Date(d3.max(yearsDate))])
     .range([padding, chartWidth - padding])
 
   const xAxis = d3.axisBottom(xScale)
@@ -57,14 +41,49 @@ const displayChart = async () => {
     .data(dataset)
     .enter()
     .append('rect')
-    .attr('data-date', (d, i) => d[0])
+    .attr('data-date', (d) => d[0])
     .attr('data-gdp', (d) => d[1])
     .attr('class', 'bar')
-    .attr('x', (d, i) => padding + i * 2.25)
+    .attr(
+      'x',
+      (d, i) => padding + ((chartWidth - padding * 2) / dataset.length) * i
+    )
     .attr('y', (d) => yScale(d[1]))
-    .attr('width', chartWidth / dataset.length - 1)
+    .attr('width', (chartWidth - padding * 2) / dataset.length + 1)
     .attr('height', (d) => chartHeight - padding - yScale(d[1]))
-    .attr('fill', 'gray')
+    .on('mouseover', (e) => {
+      const element = e.target.getBoundingClientRect()
+      const left = (element.right + element.left) / 2
+      const date = e.target.dataset.date
+      const gdp = e.target.dataset.gdp
+      const tooltip = document.getElementById('tooltip')
+      const refactorDate = (date = string) => {
+        const year = date.substring(0, 4)
+        let quarter = date.substring(5, 7)
+        if (quarter === '01') {
+          quarter = `Q1`
+        }
+        if (quarter === '04') {
+          quarter = `Q2`
+        }
+        if (quarter === '07') {
+          quarter = `Q3`
+        }
+        if (quarter === '10') {
+          quarter = `Q4`
+        }
+        return `${year}, ${quarter}</>`
+      }
+      tooltip.innerHTML = `<h3>${refactorDate(date)}<h3>
+      <h4>$${gdp} Billions</h4>`
+      tooltip.classList.add('active')
+      tooltip.style.left = `${left}px`
+      tooltip.dataset.date = date
+    })
+    .on('mouseout', (e, i) => {
+      const tooltip = document.getElementById('tooltip')
+      tooltip.classList.remove('active')
+    })
 
   svg
     .append('g')
@@ -77,35 +96,6 @@ const displayChart = async () => {
     .attr('id', 'y-axis')
     .attr('transform', `translate(${padding},0)`)
     .call(yAxis)
-
-  var tooltip = d3
-    .select(chartContainer)
-    .append('div')
-    .attr('id', 'tooltip')
-    .attr('class', 'tooltip')
-    .attr('data-date', '')
-  const bars = document.querySelectorAll('.bar')
-  bars.forEach((bar) => {
-    bar.addEventListener('mouseover', (e) => {
-      const element = e.target.getBoundingClientRect()
-      const center = (element.top + element.bottom) / 2
-      const left = (element.right + element.left) / 2
-      const date = e.target.dataset.date
-      const gdp = e.target.dataset.gdp
-      const tooltip = document.getElementById('tooltip')
-      tooltip.innerHTML = `<h3>${date}<h3><h4>${gdp}</h4>`
-      tooltip.classList.add('active')
-      tooltip.style.top = `${center}px`
-      tooltip.style.left = `${left}px`
-      tooltip.dataset.date = date
-    })
-  })
-  window.addEventListener('mouseover', (e) => {
-    if (!e.target.classList.contains('bar')) {
-      const tooltip = document.getElementById('tooltip')
-      tooltip.classList.remove('active')
-    }
-  })
 }
 
 export default displayChart
